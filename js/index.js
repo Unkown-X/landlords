@@ -1,825 +1,962 @@
-/*
-	定义玩家对象
- */
-function player(pokers,parentEle,seat,current_index){
-	this.pokers = pokers;		// 玩家手牌
-	this.parentEle = parentEle;	 	// 父元素，在此元素内生成各种子元素，如倒计时、出牌按钮等
-	this.Poker = [];			// 手牌元素
-	this.length = this.pokers.length;			// 手牌数量
-	this.seat = seat;
-	this.role = 0;
-	this.current_index = current_index;
-	this.next_index = (current_index == 2)? 0:(current_index + 1);
-
-	this.createEle();
-	this.dealPokers();
-}
-
-player.prototype = {
-	constructor: player,
-
-	// 生成按钮和倒计时等
-	createEle: function(){
-		// 倒计时
-		this.timeEle = $('<div class="time" />');
-		this.timeSpan = $('<span />');
-
-		// 抢按钮父元素
-		this.lordEle = $('<div class="lord_btns" />');
-
-		// 叫地主按钮
-		this.askBtn = $('<input type="button" value="叫地主">')
-		this.noaskBtn = $('<input type="button" value="不叫">')
-
-		// 抢地主按钮
-		this.robBtn = $('<input type="button" value="抢地主">')
-		this.norobBtn = $('<input type="button" value="不抢">')
-
-		// 出牌按钮父元素
-		this.playEle = $('<div class="play_btns" />');
-
-		// 不要按钮
-		this.passBtn = $('<input type="button" value="不要">')
-
-		// 出牌按钮
-		this.playBtn = $('<input type="button" value="出牌">')
-
-		// 提示按钮
-		this.tipBtn = $('<input type="button" value="提示">')
-
-		// 添加元素
-		this.timeEle.append(this.timeSpan);
-		this.lordEle.append(this.noaskBtn).append(this.askBtn).append(this.norobBtn).append(this.robBtn)
-		this.playEle.append(this.playBtn).append(this.passBtn).append(this.tipBtn)
-		this.parentEle.append(this.timeEle).append(this.lordEle).append(this.playEle)
-
-		this.hideAllBtn();	// 先隐藏所有元素
-	},
-
-	dealPokers: function(){
-		this.putoutPokers();	// 在页面生成手牌
-		this.judge();			// 判断哪种定位方式：如果是左右两边玩家，则垂直排列手牌
-		this.backPoker()		// 收拢动画
-	},
-
-	// 手牌垂直排列
-	rankPokers_v: function(){
-		for(var i=0; i<this.length; i++){
-			this.Poker[i].css('top',(-this.length/2+i)*30+'px')
+$(function(){
+	//初始化牌堆
+	for(var i=1;i<=54;i++){
+		$('.all_poker').append('<li class="back"></li>');
+		$('.back').eq(i-1).css('top',-(i-1)+'px');
+	}
+	//初始化牌堆数据
+	/*
+		由于每张扑克牌含有两个数据，所以我们设计数据结构时需要把一个数据看成两个值
+		例如：黑桃a 14_3,红心a 14_2 梅花a 14_1 方砖a 14_0 点数_花色
+		joker=16 2=15 啊=14；
+	 */
+	var all_poker_data = ['16_1','16_0'];
+	for(var i=3;i<16;i++){
+		for(var j=0;j<4;j++){
+			all_poker_data.push(i+'_'+j);
 		}
-	},
-
-	// 手牌水平排列
-	rankPokers_h: function(){
-		for(var i=0; i<this.length; i++){
-			this.Poker[i].css('left',(-this.length/2+i)*30+'px')
-		}
-	},
-
-	// 创建手牌
-	makePoker: function(){
-		for(var i=0; i<this.pokers.length; i++){
-			if(this.pokers[i].src == poker_data[0].src || this.pokers[i].src == poker_data[1].src || this.pokers[i].src == poker_data[2].src){
-				this.Poker.push($('<li class="on" index="'+this.pokers[i].index+'" level="'+this.pokers[i].level+'" style="background:url(./img/puke1/'+this.pokers[i].src+'.jpg)"></li>'))
-			}else{
-				this.Poker.push($('<li index="'+this.pokers[i].index+'" level="'+this.pokers[i].level+'" style="background:url(./img/puke1/'+this.pokers[i].src+'.jpg)"></li>'))
-			}
+	}
+	// console.log(all_poker_data);
+	//初始化玩家数据
+	// var all_play = [];
+	// var player1 = {name:'玩家1',integtal:1000,role:0,poker:[]};
+	// all_player.push(player1);
+	// // name=>用户昵称; intergarl =>积分; role =>角色  0 代表农民，1代表地主；poker=>玩家当前牌的数据
+	// var player2 = {name:'玩家2',integtal:1000,role:0,poker:[]};
+	// all_player.push(player2);
+	// var player3 = {name:'玩家3',integtal:1000,role:0,poker:[]};
+	// all_player.push(player3);
+	// 
+	var all_play=[];
+	all_play.push({name:'刀光剑影',integtal:1000,role:0,poker:[]});
+	all_play.push({name:'日穿钢板',integtal:1000,role:0,poker:[]});
+	all_play.push({name:'见女就怼',integtal:1000,role:0,poker:[]});
+	var skin=1;//'换肤'的
+	var not=0;//'不要'的变量
+	var rob = 0;//定义一个变量来切换抢地主的音频
+	var temp_stauts = -1;//定义一个变量用来存储临时身份;
+	var ready_poker = {poker:[],type:0,max:0};//初始化准备出的牌型
+	var desktop_poker = {poker:[],type:0,max:0}; //初始化桌面上的牌型
+	var count = 15;//初始化倒计时时间,单位是秒
+	var click_num = 0;//定义点击次数
+	//绑定洗牌事件
+	$('.all_poker').on('click','.start',function(){
+		if(click_num==0){
+			//洗牌阶段
 			
-		}
-	},
-
-	// 判断怎么排列手牌
-	judge: function(){
-		this.length = this.Poker.length
-		if(this.seat == 'v'){
-			this.rankPokers_v();
+			deal(0);//发牌阶段
+			setTimeout(function(){
+				getBoss();
+			},3500);	
+			
+			$('.start').remove()//清除发牌按钮
 		}else{
-			this.rankPokers_h();
-		}
-	},
-
-	// 生成手牌
-	putoutPokers: function(){
-		this.makePoker();
-		for(var i=0; i<this.pokers.length; i++){
-			this.parentEle.append(this.Poker[i])
-		}
-	},
-
-	// 排序手牌
-	sortPoker: function(){
-		this.pokers.sort(function(x,y){
-			var x_arr = [x.index, x.level];
-			var y_arr = [y.index, y.level];
-
-			// 先判断牌的点数
-			if(x_arr[0] != y_arr[0]){
-				//点数不相同，使用点数进行排序
-				return y_arr[0] - x_arr[0];
-			}else{
-				// 点数相同，使用花色排序
-				return x_arr[1] - y_arr[1];
-			}
-		});
-	},
-
-	/*
-		发牌后排序动画
-	 */ 
-	// 收拢动画
-	backPoker: function(){
-		if(this.seat == 'v'){
-			for(var i=0; i<this.length; i++){
-				this.Poker[i].animate({'top':(-this.length/2+0)*30+'px'},300)
-			}
-		}else{
-			for(var i=0; i<this.length; i++){
-				this.Poker[i].animate({'left':(-this.length/2+0)*30+'px'},300)
-			}
-		}
-		this.clearPoker();
-	},
-
-	// 清空牌堆
-	clearPoker: function(){
-		var that = this;
-		setTimeout(function(){
-			for(var i=0; i<that.length; i++){
-				that.Poker[i].remove()
-			}
-			that.Poker = []
-			that.sortPoker();
-			that.putoutPokers();
-			that.judge_ani();
-		},1000)
-	},	
-
-	// 收拢后定位
-	// 垂直
-	anisetPoker_v: function(){
-		for(var i=0; i<this.length; i++){
-			this.Poker[i].css({'top':(-this.length/2+0)*30+'px'})
-		}
-	},
-	// 水平
-	anisetPoker_h: function(){
-		for(var i=0; i<this.length; i++){
-			this.Poker[i].css({'left':(-this.length/2+0)*30+'px'})
-		}
-	},
-
-	// 摊开动画
-	// 垂直
-	anmatPoker_v: function(){
-		for(var i=0; i<this.length; i++){
-			this.Poker[i].animate({'top':(-this.length/2+i)*30+'px'},300)
-		}
-	},
-	// 水平
-	anmatPoker_h: function(){
-		for(var i=0; i<this.length; i++){
-			this.Poker[i].animate({'left':(-this.length/2+i)*30+'px'},300)
-		}
-	},
-
-	// 判断执行那个方向的动画
-	judge_ani: function(){
-		if(this.seat == 'v'){
-			this.anisetPoker_v();
-			this.anmatPoker_v();
-		}else{
-			this.anisetPoker_h();
-			this.anmatPoker_h();
-		}
-	},
-
-	// 隐藏所有按钮
-	hideAllBtn: function(){
-		this.timeEle.hide();
-		this.lordEle.hide();
-		this.askBtn.hide();
-		this.noaskBtn.hide();
-		this.norobBtn.hide();
-		this.robBtn.hide();
-		this.playEle.hide();
-		clearInterval(this.int);
-	},
-
-	// 重置倒计时
-	resetTime: function(){
-		this.time = 30;
-		this.timeEle.hide();
-	},
-	// 倒计时
-	countDown: function(second){
-		var that = this;
-		that.timeEle.show();
-		that.timeSpan.text(second)
-		second--;
-		that.int = setInterval(function(){
-			that.timeEle.show();
-			that.timeSpan.text(second)
-			second--;
-			if(second <0){
-				clearInterval(that.int);
-			}
-		},1000)
-	},
-
-	// 叫地主
-	askLord: function(){
-		// 显示按钮
-		this.lordEle.show();
-		this.askBtn.show();
-		this.noaskBtn.show();
-		// 绑定事件
-		this.askEvents();
-		this.countDown(30)
-	},
-
-	// 抢地主
-	robLord: function(){
-		// 显示按钮
-		this.lordEle.show();
-		this.robBtn.show();
-		this.norobBtn.show();
-		// 绑定事件
-		this.robEvents();
-		this.countDown(30)
-	},
-
-	/*
-		定义事件: 抢/叫地主，不要/出牌/提示等
-	 */
-	askEvents: function(){
-		var that = this;
-		//	叫地主
-		that.askBtn.click(function(){
-			that.role = 1;
-			that.btnWork();
-		})
-
-		// 不叫地主
-		that.noaskBtn.click(function(){
-			that.role = 0;
-			that.btnWork();
-		})
-	},
-	robEvents: function(){
-		var that = this;
-		//	抢地主
-		that.robBtn.click(function(){
-			that.role = 1;
-			that.btnWork();
-		})
-
-		// 不抢地主
-		that.norobBtn.click(function(){
-			that.role = 0;
-			that.btnWork();
-		})
-	},
-
-	// 牌点击事件
-	pokerEvent: function(){
-		for(var i=0; i<this.length; i++){
-			this.Poker[i].click(function(){
-				$(this).toggleClass('on')
-			})
-		}
-	},
-
-	// 点击按钮后的操作
-	btnWork: function(){
-		ask_lord++;
-		this.hideAllBtn();
-		this.checkLord();
-	},
-
-	// 抢得地主后发牌重新发牌
-	reDealPoker: function(){
-		for(var i=0; i<this.length; i++){
-			this.Poker[i].remove()
-		}
-		this.length = this.pokers.length;
-		this.Poker = []
-		this.sortPoker();
-		this.putoutPokers();
-		this.judge();
-	},
-
-	// 判断是否已经有人叫了地主
-	checkAsk: function(){
-		for(var i=0; i<3; i++){
-			if(all_player[i].role == 1) return true;
-		}
-		return false;
-	},
-
-	// 判断是开始叫地主还是抢地主
-	onLord: function(){
-		if(this.checkAsk()){
-			this.robLord();
-		}else{
-			this.askLord();
-		}
-	},
-
-	// 判断是否抢/叫地主成功
-	checkLord: function(){
-		if(ask_lord < 3){
-			all_player[this.next_index].onLord();
-		}
-		if(ask_lord >= 3 && !(this.checkAsk())){
-			alert('草拟吗！都不叫地主还玩个G2。')
-			window.location.reload();
-		}else if(ask_lord == 3 && this.checkAsk()){
-			if(this.calAsk() == 1){
-				this.giveLord();
-				return;
-			}
-			if(this.calAsk() == 2 && all_player[random_play].role == 0){
-				var pre_index = (this.current_index == 0)? 2:(this.current_index - 1);
-				all_player[pre_index].onLord();
-			}
-			if(this.calAsk() == 2 && all_player[random_play].role == 1){
-				all_player[this.next_index].onLord();
-			}
-			if(this.calAsk() == 3){
-				all_player[this.next_index].onLord();
-			}
-		}else if(ask_lord > 3){
-			if(this.role == 1){
-				this.successLord();
-			}else{
-				this.backLord();
-			}
-		}
-	},
-
-	// 计算有多少人叫/抢地主
-	calAsk: function(){
-		cal_lord = 0;
-		for(var i=0; i<3; i++){
-			if(all_player[i].role == 1) cal_lord++;
-		}
-		return cal_lord;
-	},
-
-	// 单人叫地主时，直接给地主
-	giveLord: function(){
-		for(var i=0; i<3; i++){
-			if(all_player[i].role == 1) all_player[i].successLord();
-		}
-	},
-
-	// 颁发地主
-	successLord: function(){
-		this.pokers = this.pokers.concat(poker_data);	// 剩余的三张手牌给地主
-		this.reDealPoker();			// 然后重新发牌
-		this.showLordPoker();		// 在顶部显示地主获得的三张手牌
-
-		// 出牌阶段
-		this.playPoker();
-	},
-
-	// 第四次抢地主放弃时，返回一位是地主
-	backLord: function(){
-		var index = this.current_index;
-		do{
-			var pre_index = (index == 0)? 2:(index - 1);
-			index = pre_index;
-		}while(all_player[pre_index].role != 1);
-		all_player[pre_index].successLord();
-	},
-
-	// 显示地主获得的三张手牌
-	showLordPoker: function(){
-		$('.poker_wrap li').each(function(index){
-			$(this).css({background: 'url(./img/puke1/'+poker_data[index].src+'.jpg)'})
-		})
-	},
-
-	/*
-		出牌方法
-	 */
-	clearEvents: function(){
-		for(var i=0; i<this.length; i++){
-			this.Poker[i].unbind();
-		}
-		this.passBtn.unbind();
-		this.playBtn.unbind();
-	},
-
-	playPoker: function(){
-		// 显示出牌按钮
-		this.countDown(30);
-		this.showPlayBtn();
-		
-		// 添加出牌事件
-		this.clearEvents();
-		this.btnEvent();
-		this.pokerEvent();
-
-	},
-
-	// 显示出牌按钮
-	showPlayBtn: function(){
-		this.playEle.show();
-		this.passBtn.show();
-		this.playBtn.show();
-		this.tipBtn.show();
-		this.correctBtn();
-	},
-
-	// 按钮点击事件
-	btnEvent: function(){
-		var that = this;
-		play_count ++;
-		// 出牌按钮
-		that.playBtn.click(function(){
-			that.playPokers();
-		})
-
-		// 不要按钮
-		that.passBtn.click(function(){
-			no_play++;
-			that.hideAllBtn();
-			that.resetPlay();
-			all_player[that.next_index].playPoker();
-		})
-	},
-
-	// 获取要打出的手牌点数
-	getPokerIndex: function(){
-		var that = this;
-		var arr = [];
-		that.Poker.forEach(function(item,index){
-			if(item.hasClass('on')){
-				arr.push(Number(item.attr('index')))
-			}
-		})
-		return arr;
-	},
-
-	// 合法显示按钮：必须出牌时没有“不要”按钮
-	correctBtn: function(){
-		if(play_count == 0){
-			this.passBtn.hide();
-		}
-	},
-
-	// 当玩家出牌大于另外两家时，重置出牌
-	resetPlay: function(){
-		if(no_play == 2){
-			play_count = 0;
-		}
-	},
-
-	/*
-		判断玩家操作是否合法
-	 */
-	// 三条 012
-	thT: function(arr){
-		if(arr.length !=3 ){
-			return false
-		}else{
-			for(var i=0; i<arr.length-1; i++){
-				if(arr[i] != arr[i+1]){ return false }
-			}
-			poker_max = parseInt(poker_max);
-			arr[0] = parseInt(arr[0]);
-			if(poker_max >= arr[0] && play_count > 1){ return false }
-			poker_max = arr[0]
-			return true
-		}
-	},
-	// 连对
-	liandui: function(arr){
-		if(arr.length < 6 || arr.length%2!=0){//0 12 34 5
-			return false;
-		}else {
-			for(var i=1; i<arr.length; i++){
-				if(i%2 == 0 && (arr[i-1]-1) != arr[i]){
-					return false;
-				}
-			}
-			for(var i=0; i<arr.length; i++){
-				if(i%2 == 0){
-					if(arr[i] != arr[i+1]){ return false }
-				}
-			}
-			poker_max = parseInt(poker_max);
-			arr[0] = parseInt(arr[0]);
-			if(poker_max >= arr[0] && play_count > 1){ return false }
-			poker_max = arr[0]
-			return true;
-		}
-	},
-	// 顺子
-	shunzi: function(arr){
-		if(arr[0] == 15){
-			return false;
-		}
-		if(arr.length < 5){
-			return false;
-		}else{
-			arr.forEach(function(item){
-				if(item>=16){
-					return false
-				}
-			})
-			for(var i=0; i<arr.length-1; i++){
-				if((arr[i]-1) != arr[i+1]){ return false }
-			}
-			poker_max = parseInt(poker_max);
-			arr[0] = parseInt(arr[0]);
-			if(poker_max >= arr[0] && play_count > 1){ return false }
-			poker_max = arr[0]
-			return true;
-		}
-	},
-	// 三带一
-	thO: function(arr){
-		if(arr.length!=4){
-			return false;
-		}else{
-			if(arr[0] == arr[1] && arr[1] == arr[2] && arr[2] != arr[3] || arr[0] != arr[1] && arr[1] == arr[2] && arr[2] == arr[3]){
-				poker_max = parseInt(poker_max);
-				arr[1] = parseInt(arr[1]);
-				if(poker_max >= arr[1] && play_count > 1){ return false }
-				poker_max = arr[1]
-				return true;
-			}else{
-				return false
-			}
-		}
-	},
-	// 三带一对
-	thD: function(arr){
-		if(arr.length!=5){
-			return false;
-		}else{
-			if(arr[0] == arr[1] && arr[1] == arr[2] & arr[3] == arr[4] || arr[0] == arr[1] && arr[2] == arr[3] && arr[3] ==arr[4]){
-				poker_max = parseInt(poker_max);
-				arr[2] = parseInt(arr[2]);
-				if(poker_max >= arr[2] && play_count > 1){
-					console.log(poker_max,arr[2]);
-					 return false 
-				}
-				poker_max = arr[2]
-				return true;
-			}else{
-				return false;
-			}
-		}
-	},
-	// 炸弹
-	Boom: function(arr){
-		if(arr.length != 4){
-			return false;
-		}else{
-			if(arr[0] == arr[1] && arr[1] == arr[2] && arr[2] == arr[3]){
-				poker_max = parseInt(poker_max);
-				arr[1] = parseInt(arr[1]);
-				if(poker_max >= arr[1] && play_count > 1 && poker_type == 999){ return false }
-				poker_max = arr[1]
-				return true;
-			}else{
-				return false;
-			}
-		}
-	},
-	// 飞机
-	plane: function(arr){
-		if(arr.length == 6){
-			if(arr[2] - 1 == arr[3]){
-				if(arr[0] == arr[1] && arr[1] == arr[2] && arr[3] == arr[4] && arr[4] == arr[5]){
-					return true;
-				}else{
-					return false;
-				}
-			}else{
-				return false;
-			}
-		}
-		// aaabbb11, 11aaabbb 1aaabbb1
-		if(arr.length == 8){
-			if(arr[2] - 1 == arr[3] || arr[4] - 1 == arr[5] || arr[3] - 1 == arr[4]){
-				if(arr[0] == arr[1] && arr[1] == arr[2] && arr[3] == arr[4] && arr[4] == arr[5] || arr[2] == arr[3] && arr[3] == arr[4] && arr[5] == arr[6] && arr[6] == arr[7] || arr[1] == arr[2] && arr[2] == arr[3] && arr[4] == arr[5] && arr[5] == arr[6]){
-					return true;
-				}else{
-					return false;
-				}
-			}else{
-				return false;
-			}
-		}
-		// aaabbb1122, 11aaabbb22, 1122aaabbb
-		if(arr.length == 10){
-			if(arr[2] - 1 == arr[3] || arr[4] - 1 == arr[5] || arr[6] - 1 == arr[7]){
-				if(arr[0] == arr[1] && arr[1] == arr[2] && arr[3] == arr[4] && arr[4] == arr[5] && arr[6] == arr[7] && arr[8] == arr[9]){
-					return true;
-				}
-				if(arr[0] == arr[1] && arr[2] == arr[3] && arr[3] == arr[4] && arr[5] == arr[6] && arr[6] == arr[7] && arr[8] == arr[9]){
-					return true;
-				}
-				if(arr[0] == arr[1] && arr[3] == arr[2] && arr[4] == arr[5] && arr[5] == arr[6] && arr[7] == arr[8] && arr[8] == arr[9]){
-					return true;
-				}
-				return false;
-			}else{
-				return false;
-			}
-		}
-	},
-
-	//判断出牌是否合法
-	checkPoker: function(arr){
-		if(arr.length == 2 || arr.length == 4){
-			if(arr[0] == 17 && arr[1] == 16){
-				poker_max = 110;
-				return 110;
-			}else if(this.Boom(arr)){
-				return 999;
-			}
-		}
-		if(arr.length != poker_length && play_count > 1){
-			console.log('123'+play_count)
-			return 0;
-		}
-		poker_length = arr.length;
-		if(poker_length == 1){
-			poker_max = parseInt(poker_max);
-			arr[0] = parseInt(arr[0]);
-			if(poker_max >= arr[0] && play_count > 1){ return 0 }
-			poker_max = arr[0];
-			return 1;
-		}else if(poker_length == 2 && arr[0] == arr[1]){
-			poker_max = parseInt(poker_max);
-			arr[0] = parseInt(arr[0]);
-			if(poker_max >= arr[0] && play_count > 1){ return 0 }
-			poker_max = arr[0];
-			return 2;
-		}else if(poker_length == 2 && arr[0] == 17 && arr[1] == 16){
-			poker_max = 110;
-			return 110;
-		}else if(poker_length >2 ){
-			if(this.thT(arr)){
-				return 3
-			}else if(this.thO(arr)){
-				return 4;
-			}else if(this.thD(arr)){
-				return 5;
-			}else if(this.shunzi(arr)){
-				return 6;
-			}else if(this.liandui(arr)){
-				return 7;
-			}else if(this.plane(arr)){
-				return 8;
-			}else if(this.Boom(arr)){
-				return 999;
-			}else{
-				return 0;
-			}
-		}
-	},
-
-	// 出牌操作
-	playPokers: function(){
-		var arr = this.getPokerIndex();		// 获取选中要出的手牌
-		console.log(arr)
-		if(arr.length == 0){ alert('出牌不合法！'); return; }
-		var temp_type = this.checkPoker(arr);	// 判断要出的手牌是否合法，同时返回牌的类型
-		console.log(temp_type)
-		if(play_count > 1){
-			if(temp_type != poker_type && temp_type != 110 && temp_type != 999){
-				alert('出牌不合法！')
-				return;
-			}else{
-				poker_type = temp_type;
-			}
-		}else{
-			poker_type = temp_type;
-		}
-
-		if(poker_type){
-			this.displayPoker();	// 显示打出的牌
-			this.hideAllBtn();
-			all_player[this.next_index].playPoker();
-		}else{
-			alert('出牌不合法！')
 			return;
 		}
-		no_play=0;
-	},
-
-	// 打出的牌显示在页面上
-	displayPoker: function(){
-		$('.pokers').empty();
-		var temp_poker = this.getSelect();
-		for(var i=0; i<temp_poker.length; i++){
-			temp_poker[i].css({'left':(-temp_poker.length/2+i)*30+'px'})
-			$('.pokers').append(temp_poker[i])
+		click_num++;
+	});
+	
+	// //洗牌函数(待优化)
+	// function clearPoker(){
+	// 	var alpha = setInterval(function(){
+	// 		for(var i=0;i<54;i++){
+	// 			var rad_l=Math.floor(Math.random()*100)-50; 
+	// 			$('.back').eq(i).animate({left:-rad_l+'px'},20).css('transform','rotate('+i*30+'deg)');
+	// 		}
+	// 	},20)
+	// 	setTimeout(function(){
+	// 		clearInterval(alpha);
+	// 		for(var i=0;i<54;i++){
+	// 			$('.back').eq(i).animate({left:'0px'},10);
+	// 		}
+	// 	},1500)
+	// 	for(var i=0;i<2;i++){
+	// 		all_poker_data.sort(function(){return 0.5-Math.random();});//牌堆数据打乱
+	// 	}
+	// 	// console.log(all_poker_data);
+	// }
+shuffle();
+function shuffle(){
+	// 生成牌堆
+	for(var i=0;i<4;i++){
+		$('.box').append('<ul class="ul"></ul>');
+		for(var j=0;j<=14;j++){
+			$('.ul').append('<li style="top:-'+j+'px;"></li>')
 		}
-	},
-
-	// 获取选中的手牌
-	getSelect: function(){
-		var that = this;
-		var temp_poker = [];
-		that.Poker.forEach(function(item,index){
-			if(item.hasClass('on')){
-				temp_poker.push(item);
+	}	
+	for(var i=0;i<2;i++){
+		all_poker_data.sort(function(){return 0.5-Math.random();});//牌堆数据打乱
+	}
+	var num1 = 0;
+	var num2 = 0;
+	setTimeout(function(){
+		setTimeout(function(){animation2()},1800);
+		setTimeout(function(){animation3()},4650);
+		anination1();
+	},1000)
+	// 动画1 生成牌堆 添加出场效果
+	function anination1(){
+		if(num1>14){
+			return;
+		}
+		setTimeout(function(){
+			$('.ul:eq(0) li').eq(num1).addClass('li1');		
+			$('.ul:eq(1) li').eq(num1).addClass('li2');		
+			$('.ul:eq(2) li').eq(num1).addClass('li1');		
+			$('.ul:eq(3) li').eq(num1).addClass('li2');		
+			num1++
+			anination1();
+		},50)		
+	}
+	// 动画2 4堆牌混合 删除原有的四个牌堆 新建一个整的牌堆
+	function animation2(){
+		if(num2>14){
+			$('.box ul').animate({opacity:0},1000)
+			setTimeout(function(){
+				$('.box ul').remove();
+			},1200)		
+			return;
+		}
+		setTimeout(function(){
+			$('.ul:eq(0) li').eq(num2).animate({left:'-300px',top:'160px'},200).animate({left:'400px'},400);	
+			$('.ul:eq(1) li').eq(num2).animate({left:'300px',top:'160px'},200).animate({left:'-420px'},400);	
+			$('.ul:eq(2) li').eq(num2).animate({left:'-300px',top:'-180px'},200).animate({left:'400px'},400);	
+			$('.ul:eq(3) li').eq(num2).animate({left:'300px',top:'-180px'},200).animate({left:'-420px'},400);	
+			num2++
+			animation2();
+		},100)
+	}
+	// 动画3 删除原来牌堆 新建一堆54张牌的新牌堆 人物把牌堆扔出去
+	var num3=54;
+	function animation3(){
+		$('.box').append('<ul class="ul" style="top:125px;left:438px;"></ul>')
+		for(var i=0;i<54;i++){
+			$('.ul').append('<li class="li" style="top:-'+i+'px;"></li>');
+		}
+		$('.box').append('<div class="throw"></div>')
+		$('.ul li').css('z-index','3')
+		$('.ul li').addClass('li3')
+		setTimeout(function(){
+			animation4();
+		},700);
+		setTimeout(function(){
+			$('.throw').css('display','none');
+		},800);
+	}		
+	// 扔出去的牌随机散开
+	function animation4() {
+		if(num3<0){	
+				setTimeout(function(){
+					animation5();
+				},1500)				
+				return;		
 			}
-		})
-		return temp_poker;
+			var x = -1000+Math.floor(Math.random()*2000);
+			var y = -400+Math.floor(Math.random()*800);
+			var z = -300+Math.floor(Math.random()*600);
+			var rotate = Math.floor(Math.random()*7200);
+			$('.ul li').removeClass('li3')
+			$('.ul li').eq(num3).css({'transform':'translateX('+x+'px) translateY('+y+'px) translateZ('+z+'px)','transition':'0.5s'});
+			num3--;
+			animation4();
 	}
-
-}
-
-
-
-// 定义玩家和牌堆
-var poker_data = [];
-var all_play = [];
-all_play.push({poker:[]});
-all_play.push({poker:[]});
-all_play.push({poker:[]});
-
-// 初始化函数
-resetPokers()
-function resetPokers(){
-	// 初始化数据
-	poker_data = [];
-	ask_lord = 0;
-	for(var i=0; i<3; i++){
-		all_play[i].poker = [];
+	var num4 = 54;
+	// 散开出去的牌位置再随机更换一次
+	function animation5() {		
+		if(num4<0){
+			// 随机更换一次位置后，所有扑克牌归位
+			setTimeout(function(){
+				$('.ul li').css({'transform':'translateX(0px) translateY(0px) translateZ(0px)','transition':'1s'});
+				setTimeout(function(){
+					animation6();
+				},500)			
+			},2000);		
+			return;	
+		}
+		var x = -1000+Math.floor(Math.random()*2000);
+		var y = -400+Math.floor(Math.random()*800);
+		var z = -300+Math.floor(Math.random()*600);
+		var rotate = Math.floor(Math.random()*7200);
+		$('.ul li').eq(num4).css({'transform':'translateX('+x+'px) translateY('+y+'px) translateZ('+z+'px)','transition':'1.5s'});
+		num4--;
+		animation5();
 	}
-
-	// 初始化54张牌
-	for(var i=1; i<=54; i++){
-		var index = i%13;
-		var level = Math.ceil(i/13)
-		if(index == 0){ index = 13 }
-		if(index == 1 && level == 1){ index = 17 } // 大王
-		if(index == 2 && level == 1){ index = 16 } // 小王
-		if(index == 1 && level != 1){ index = 14 } // Ace
-		if(index == 2 && level != 1){ index = 15 } // 2
-		var temp = { src: i, index: index, level: level }
-		// src:图片路径； index：牌的值； level：花色（1为黑桃，2为红桃，3为梅花，4为方块）
-		poker_data.push(temp);
+	var num5 = 54;
+	// 所有扑克牌网上移动一定距离
+	function animation6() {
+		if(num5<0){
+			setTimeout(function(){
+				$('.box').remove();
+				$('.all_poker ').css('display','block');
+				$('.Box').remove();
+				$('.star').css('display','block');	
+			},1500);
+					
+			return;	
+		}
+		setTimeout(function(){
+			$('.ul li').eq(num5).animate({top:(-120-num5)+'px'},500);
+			num5--;
+			animation6();
+			},20);
+		}
 	}
-
-	// 打乱牌堆顺序
-	for(var i=0; i<3; i++){
-		poker_data.sort(function(){
-			return Math.random()-0.5;
-		})
+	$('.star').click(function(){
+		$(this).css('display','none');
+		deal(0);
+		setTimeout(function(){
+			getBoss();
+		},4000);	
+	})
+	//派牌动画
+	function deal(num){
+		//往左边玩家1发牌
+		$('.all_poker li:last').animate({left:'-500px',top:'200px'},20);
+		setTimeout(function(){
+			$('.all_poker li:last').remove();
+			all_play[0].poker.push(all_poker_data.pop());
+			makePoker(1,all_play[0].poker[all_play[0].poker.length-1],num,skin);
+		},30);
+		//往中间玩家2发牌
+		setTimeout(function(){
+			$('.all_poker li:last').animate({top:'400px'},20);
+			setTimeout(function(){
+				$('.all_poker li:last').remove();
+				all_play[1].poker.push(all_poker_data.pop());
+				makePoker(2,all_play[1].poker[all_play[1].poker.length-1],num,skin);
+			},30);	
+		},40);
+		//往右边玩家3发牌
+		setTimeout(function(){
+			$('.all_poker li:last').animate({left:'500px',top:'200px'},20);
+			setTimeout(function(){
+				$('.all_poker li:last').remove();
+				all_play[2].poker.push(all_poker_data.pop());
+				makePoker(3,all_play[2].poker[all_play[2].poker.length-1],num,skin);
+				num++;	
+				if(num<17){
+					deal(num);
+				}else{
+					$('.all_poker li').each(function(i){
+						$(this).animate({'left':-150+i*150+'px'},100).css('transform','rotate(0deg)');
+						all_play[0].poker = sortPoker(all_play[0].poker);
+						all_play[1].poker = sortPoker(all_play[1].poker);
+						all_play[2].poker = sortPoker(all_play[2].poker);
+						//等一秒后，整理扑克牌翻转整理扑克牌
+						setTimeout(function(){
+							$('.p1 li').attr('class','back').css('background-image','');
+							$('.p2 li').attr('class','back').css('background-image','');
+							$('.p3 li').attr('class','back').css('background-image','');
+							setTimeout(function(){
+								$('.p1 li').remove();
+								$('.p2 li').remove();
+								$('.p3 li').remove();
+								for(var i=0;i<all_play[0].poker.length;i++){
+									makePoker(1,all_play[0].poker[i],i,skin);
+								}
+								for(var i=0;i<all_play[1].poker.length;i++){
+									makePoker(2,all_play[1].poker[i],i,skin);
+								}
+								for(var i=0;i<all_play[2].poker.length;i++){
+									makePoker(3,all_play[2].poker[i],i,skin);
+								}
+							},500);
+						},1000);
+						// 设置一个换肤按钮，在翻牌后改变牌的图片
+						$('body').on('click','.change',function(poker){
+							setTimeout(function(){
+								$('.p1 li').attr('class','back').css('background-image','');
+								$('.p2 li').attr('class','back').css('background-image','');
+								$('.p3 li').attr('class','back').css('background-image','');
+								setTimeout(function(){
+									$('.p1 li').remove();
+									$('.p2 li').remove();
+									$('.p3 li').remove();
+									for(var i=0;i<all_play[0].poker.length;i++){
+										makePoker(1,all_play[0].poker[i],i,skin);
+									}
+									for(var i=0;i<all_play[1].poker.length;i++){
+										makePoker(2,all_play[1].poker[i],i,skin);
+									}
+									for(var i=0;i<all_play[2].poker.length;i++){
+										makePoker(3,all_play[2].poker[i],i,skin);
+									}
+									//更换背景
+									$('body').css({'background':'url(./images/'+skin+'/bg.jpg)no-repeat center ','background-size':'100%'});
+								},500);
+							},1000);
+							skin=(++skin>4)? 1:skin;
+						})
+					})
+				}
+			},30);
+		},80);
 	}
-
-	// 给玩家分发手牌
-	for(var i=0; i<17; i++){
-		all_play[0].poker.push(poker_data.pop());
-		all_play[1].poker.push(poker_data.pop());
-		all_play[2].poker.push(poker_data.pop());
+	//定义一个生成牌面的方法
+	function makePoker(pokername,poker,num,pic){
+		if(pokername==2 ||pokername==0 ){
+			$('.p'+pokername).append('<li data-value="'+poker+'"></li>').css({left:-40*num+'px'});
+			$('.p'+pokername+' li:last').css({left:40*num+'px',"background-image":'url(./images/'+pic+'/'+poker+'.jpg)'});
+		}else{
+			$('.p'+pokername).append('<li data-value="'+poker+'"></li>').css({top:-30*num+'px'});
+			$('.p'+pokername+' li:last').css({top:30*num+'px',"background-image":'url(./images/'+pic+'/'+poker+'.jpg)'});
+		}	
 	}
-}
+	//定义一个扑克牌数据整理函数
+	function sortPoker(poker){
+		poker = poker.sort(function(x,y){
+			var x_arr = x.split('_');
+			var y_arr = y.split('_');
+			//判断牌的点数
+			if(x_arr[0] != y_arr[0]){
+				//点数不相同，使用点数排序
+				return y_arr[0] - x_arr[0];
 
-// 最后三张牌
-function lastThreePoker(){
-	for(var i=0; i<3; i++){
-		$('.poker_wrap').append('<li class="back" style="left: 0"></li>');
+			}else{
+				//点数相同，使用花色排序
+				return y_arr[1] - x_arr[1];
+			}
+		});
+		return poker;
 	}
-	for(var i=0; i<3; i++){
-		$('.poker_wrap li').eq(i).animate({'left':(i-1)*120+'px'},500)
+	//定义一个抢地主的方法	2 为要 5为不要;
+	/*  code   含义
+		255    第一个为地主   
+		525    第二个为地主
+		552    第三个为地主
+		225    第二个为地主
+		252    第三个为地主
+		522    第三个为地主
+		2222   第一个为地主
+		2225   第三个为地主
+	 */
+	function getBoss(start,cancle,code,num){
+		num = num || 0
+		code = code || 0;
+		console.log('code:'+code);
+		cancle = cancle || 0;
+		$('.getBoss').remove();
+		num = (num == 0 || num == 1) ? 1:2;//1 叫地主 2 抢地主
+		for(var i=1;i<4;i++){
+			$('.p'+i).after('<p class="getBoss"><input class="jiao'+num+'" type="button"  data-value="'+i+'"><input class="nojiao" type="button"></p>');
+		}
+		console.log('cancle'+cancle);
+		if(cancle >= 3){
+			alert('扑街都不抢地主，不玩了~');
+			window.location.reload();
+			return false;
+		}
+		if(start == undefined){
+			start = Math.round(Math.random()*2);
+		}
+		//判断谁是地主
+		switch(code){
+			case 255:
+				Boss(start);
+			break;
+
+			case 525:
+				start = (++start >2) ? 0 : start;
+				Boss(start);
+			break;
+
+			case 552:
+				start = (--start <0) ? 2 : start;
+				Boss(start);
+			break;
+
+			case 225:
+				start = (++start >2) ? 0 : start;
+				Boss(start);
+			break;
+
+			case 252:
+				start = (--start <0) ? 2 : start;
+				Boss(start);
+			break;
+
+			case 522:
+				start = (--start <0) ? 2 : start;
+				Boss(start);
+			break;
+
+			case 2222:
+				start = (--start <0) ? 2 : start;
+				Boss(start);
+			break;
+
+			case 2225:
+				start = (++start >2) ? 0 : start;
+				Boss(start);
+			break;
+		}
+
+		// 先把所有玩家叫地主的组件隐藏
+		$('.getBoss').hide();
+
+		// 把开始叫地主的人的页面组件显示
+		$('.getBoss').eq(start).show();
+		//绑定叫地主的按钮方法
+		$('.getBoss').eq(start).find('input').eq(0).click(function(){
+			code = 2+10*code;
+			num = 3;
+			if(code <= 20){
+				$('body').append('<audio src="./music/Woman_Order.ogg" autoplay="autoplay" ></audio>')
+			}else{
+				rob = (++rob>3)? 1:rob;
+				console.log(rob)
+				$('body').append('<audio src="./music/Woman_Rob'+rob+'.ogg" autoplay="autoplay" ></audio>')//抢地主的音频
+			}
+			start = (++start >2) ? 0 : start;
+			getBoss(start,cancle,code,num);
+		});
+			
+		//绑定不叫地主的按钮
+		$('.getBoss').eq(start).find('input').eq(1).click(function(){
+			code = 5+10*code;
+			start = (++start >2) ? 0 : start;
+			getBoss(start,cancle+1,code,num);
+			$('body').append('<audio src="./music/Woman_NoOrder.ogg" autoplay="autoplay" ></audio>')
+		});
 	}
-}
-setTimeout(function(){
-	lastThreePoker()
-},1000)
+	//定义一个当地主的方法
+	function Boss(start){
+		//通过点击得到的那个玩家抢地主的值来判断谁当地主
+		var value = Number($('.getBoss').eq(start).find('input').eq(0).attr('data-value'));
+		//当地主的玩家相关的值要更改;
+		all_play[start].role = 1;
+		//生成玩家信息
+		var role = ['农民','地主'];
+		for(var i=1;i<4;i++){
+			$('.p'+i).after('<div class="info"><h2>'+role[all_play[i-1].role]+'</h2><h3>'+all_play[i-1].name+'</h3></div>');
+		}
+		//把剩余的三张牌翻开
+		$('.all_poker li').remove();
+		for(var i=0;i<3;i++){
+			 	makePoker(0,all_poker_data[i],i*4,skin);
 
-/*
-	创建玩家对象
- */
-var p1 = new player(all_play[0].poker,$('.player_1'),'v',0);
-var p2 = new player(all_play[1].poker,$('.player_2'),'h',1);
-var p3 = new player(all_play[2].poker,$('.player_3'),'v',2);
-var all_player = [p1,p2,p3]
+			};
+		all_play[start].poker=all_play[start].poker.concat(all_poker_data);
+		//卡牌插入
+		setTimeout(function(){
+			$('.p'+value+' li').remove();
+			all_play[start].poker = sortPoker(all_play[start].poker);
+			for(var j=0;j<all_play[start].poker.length;j++){
+						makePoker(value,all_play[start].poker[j],j,skin);
+			}
+			// console.log($('.p1 li').length);
+			$('.p0 li').remove();
+			//得到地主后删除抢地主按钮
+			$('.getBoss').remove();
+			//结束抢地主阶段进入游戏开始阶段
+			startGame(value-1);
+		},500);
+	}
+	//绑定选择事件
+	function selectPoker(num){
+		for(var i=1;i<4;i++){
+			$('.p'+i).off('click','li');
+		}
+		$('.p'+num).on('click','li',function(){	
+			switch(num){
+				case 1:
+					var left = $(this).css('left');
+					if(left != '15px'){
+						$(this).css({left:'15px'});
+						ready_poker.poker.push($(this).attr('data-value'));
+						console.log(ready_poker.poker);
+					}else{
+						$(this).css({left:'0px'});
+						//找到牌的数据
+						var index = ready_poker.poker.indexOf($(this).attr('data-value'));
+						//删除这条数据
+						ready_poker.poker.splice(index,1);
+						console.log(ready_poker.poker);
+					}
+				break;
 
-// 发牌后开始抢地主
-var ask_lord = 0;
-var cal_lord = 0;
-var random_play = Math.round(Math.random()*2)
-setTimeout(function(){
-	all_player[random_play].onLord();
-},1000)
+				case 2:
+					var top = $(this).css('top');
+					if(top != '-15px'){
+						$(this).css({top:'-15px'});
+						ready_poker.poker.push($(this).attr('data-value'));
+						console.log(ready_poker.poker);
+					}else{
+						$(this).css({top:'0px'});
+						//找到牌的数据
+						var index = ready_poker.poker.indexOf($(this).attr('data-value'));
+						//删除这条数据
+						ready_poker.poker.splice(index,1);
+						console.log(ready_poker.poker);
+					}
+				break;
 
-// 出牌阶段
-var play_count = 0;
-var no_play = 0;
-// 判断出牌的值是否合法，并返回相应的值
-var poker_length = 0;	// 出牌的数量
-// 出牌的类型：0为无效，1为单张，2为对子，3为三条，4为三带一，5为三带一，6为顺子，7为连对，8为飞机，999为炸弹，110为王炸
-var poker_type = 0;		
-var poker_max = 0;
+				case 3:
+					var left = $(this).css('left');
+					if(left != '-15px'){
+						$(this).css({left:'-15px'});
+						ready_poker.poker.push($(this).attr('data-value'));
+						console.log(ready_poker.poker);
+					}else{
+						$(this).css({left:'0px'});
+						//找到牌的数据
+						var index = ready_poker.poker.indexOf($(this).attr('data-value'));
+						//删除这条数据
+						ready_poker.poker.splice(index,1);
+						console.log(ready_poker.poker);
+					}
+				break;
+			}
+		});
+	}
+	//定义一个游戏开始的方法
+	function startGame(num){
+
+		selectPoker(num+1);
+		console.log('num:'+num);
+		$('.left').append('<p class="action"><input class="chu" type="button" value=""><input class="buchu" type="button" value=""></p><div class="countdown">16</div>');
+		$('.right').append('<p class="action"><input class="chu" type="button" value=""><input class="buchu" type="button" value=""></p><div class="countdown">16</div>');
+		$('.mid_down').append('<p class="action"><input class="chu" type="button" value=""><input class="buchu" type="button" value=""></p><div class="countdown">16</div>');
+		$('.action').hide();
+		$('.action').eq(num).show();
+		$('.countdown').hide();
+		$('.countdown').eq(num).show();
+		console.log('临时值'+temp_stauts);
+		//倒计时功能
+		if(count == 0){
+			return;
+		}
+		var Int = setInterval(function(){
+			$('.countdown').text(''+count+'');
+			console.log('count:'+count);
+			count--;
+		},1000);
+		var int = setTimeout(function(){
+			clearInterval(Int);
+			Pass();
+		},17000);
+		//绑定出牌事件
+		$('.action').eq(num).find('input').eq(0).click(function(){
+			// 在判断牌型前需要进行数据排序
+			ready_poker.poker = sortPoker(ready_poker.poker);
+			//调用一个函数专门用来判断是否能出牌
+			if(temp_stauts == num){
+				desktop_poker = {poker:[],type:0,max:0};
+			}
+			if(!checkPokers(ready_poker)){
+				alert('你的牌不符合出牌规则，请重新发牌');
+				return false;
+			}else if(!pokerVS()){
+				alert('你的牌打不过!');
+				console.log('手牌类型:'+ready_poker.type+'手牌最大值:'+ready_poker.max);
+				return false;
+			}else{
+				//出牌的完整流程
+				//1.把桌面的牌换成玩家选择出的牌
+				desktop_poker.type = ready_poker.type;
+				desktop_poker.max = ready_poker.max;
+				desktop_poker.poker = [];
+				console.log('桌面牌类型:'+desktop_poker.type+'桌面牌最大值:'+desktop_poker.max);
+				//2.保存是出牌的玩家
+				temp_stauts = num;
+				//3.调用出牌方法
+				discard(ready_poker.poker,num);
+			}
+			clearTimeout(int);
+			clearInterval(Int);
+			count = 15;//初始化计数时间
+			$('.countdown').remove();
+			$('.action').remove();
+			num = (++num>2)? 0:num;
+			startGame(num);
+		});
+		//绑定不出事件
+		$('.action').eq(num).find('input').eq(1).click(function (){
+			clearTimeout(int);
+			Pass();
+			//设置定时器 在出牌后的1.5s清除音频和火箭动画
+			setTimeout(function(){
+				$('audio').remove();
+				$('#rocket').remove()
+			},1500)
+		});
+		//封装不出牌方法
+		function Pass(){
+			clearInterval(Int);
+			if(temp_stauts == -1 || temp_stauts == num){
+				alert('你必须要出牌!');
+				return;
+			}
+			count = 15;//初始化计数时间
+			$('.countdown').remove();
+			//根据不要的次数给出不同的音频
+			not = (++not>4)? 1:not;
+			$('body').append('<audio src="./music/Woman_buyao'+not+'.ogg" autoplay="autoplay"></audio>');
+			$('.action').remove();
+			clearSelect(num);
+			num = (++num>2)? 0:num;
+			startGame(num);
+		}
+	}
+	//判断牌型的方法
+	/*
+		牌型代号说明
+		0 	无效牌型
+		1   单张
+		2 	对子
+		3 	三张
+		31 	三带一 三张相同带1张三张相同带一对
+		11	单顺 五张或更多数值连续的单牌(如： 45678 或 78910JQK )。不包括 2 和双王。
+		22	双顺 三对或更多数值连续的对牌(如：334455 、7788991010JJ )。不包括 2 和双王
+		33	三顺 二个或更多数值连续的三张牌(如：333444 、555666777888 )。不包括 2 和双王。
+		666	飞机带翅膀：三顺+同数量的任意单牌(或同数量的任意对牌)。(如：44455579 或 3334445557799JJ)
+		42	四带二：任意数值相同的四张牌 + 两张数值不相同的单牌 或者 + 任意两对对牌。(如：555579或55557799)
+		888	炸弹：任意数值相等的4张牌
+		999	火箭：大王+小王
+	 */
+	//定义一个检查扑克牌的方法
+	function checkPokers(poker){
+		var len = poker.poker.length;
+		var poker_data = [];
+		for(var i=0;i<len;i++){
+			poker_data.push(poker.poker[i].split('_'));
+		}
+		if(len==1){
+			poker.type = 1;
+			if(poker_data[0][0] == 16){
+				poker.max = poker_data[0][0] + poker_data[0][1];
+			}else{
+				poker.max = poker_data[0][0];
+			}
+			return true;
+			// alert('单张');
+		}else if(double(len,poker_data)){
+			poker.type = 2;
+			poker.max = poker_data[0][0];
+			return $('body').append('<audio src="./music/duizi.mp3" autoplay="autoplay"></audio>');
+			return true;
+			// alert('对子');
+		}else if(rocket(len,poker_data)){
+			poker.type = 999;
+			poker.max = 14;
+			return $('body').append('<audio src="./music/Man_wangzha.ogg" autoplay="autoplay"></audio><div id="rocket"><audio src="./music/Special_Bomb_New.ogg" autoplay="autoplay"></audio></div>')
+			return true;
+			// alert('火箭');
+		}else if(triple(len,poker_data)){
+			poker.type = 3;
+			poker.max = poker_data[0][0];
+			return true;
+			// alert('三张');
+		}else if(checkStraight(len,poker_data)){
+			poker.type = 11;
+			poker.max = poker_data[0][0];
+			return $('body').append('<audio src="./music/Man_shunzi.ogg" autoplay="autoplay"></audio>');
+			return true;
+			// alert('单顺');
+		}else if(doubleStraight(len,poker_data)){
+			poker.type = 22;
+			poker.max = poker_data[0][0];
+			return $('body').append('<audio src="./music/Man_liandui.ogg" autoplay="autoplay"></audio>');
+			return true;
+			// alert('双顺');
+		}else if(tripleStraight(len,poker_data)){
+			poker.type = 33;
+			poker.max = poker_data[0][0];
+			return $('body').append('<audio src="./music/Man_feiji.ogg" autoplay="autoplay"></audio>');
+			return true;
+			// alert('三顺');
+		}else if(bomb(len,poker_data)){
+			poker.type = 888;
+			poker.max = poker_data[0][0];
+			return $('body').append('<audio src="./music/Man_zhadan.ogg" autoplay="autoplay"></audio>');
+			return true;
+			// alert('炸弹');
+		}else if(AAAB(len,poker_data)){
+			poker.type = 31;
+			poker.max = poker_data[2][0];
+			return $('body').append('<audio src="./music/Man_sandaiyi.ogg" autoplay="autoplay"></audio>');
+			return true;
+			// alert('三带一');
+		}else if(AAAABB(len,poker_data)){
+			poker.type = 42;
+			poker.max = poker_data[2][0];
+			return $('body').append('<audio src="./music/Woman_sidaier.ogg" autoplay="autoplay"></audio>');
+			return true;
+			// alert('四带二');
+		}else if(poker.max = planeWing(len,poker_data)){
+			poker.type = 666;
+			alert(1);
+			return $('body').append('<audio src="./music/Woman_sidaier.ogg" autoplay="autoplay"></audio>');
+			return true;
+		}else{
+			poker.type = 0;
+			return false;
+		}
+	}
+	//判断对子的方法
+	function double(len,poker_data){
+		if(len != 2){
+			return false;
+		}else{
+			if(poker_data[0][0]==poker_data[1][0]&&poker_data[0][0]!=16){
+				return true;
+			}
+		}
+	}
+	//判断火箭的方法
+	function rocket(len,poker_data){
+		if(len !=2){
+			return false;
+		}else{
+			if(poker_data[0][0]==16&&poker_data[1][0]==16){
+				return true;
+			}
+		}
+	}
+	//判断三张的方法
+	function triple(len,poker_data){
+		if(len !=3){
+			return false;
+		}else{
+			if(poker_data[0][0]==poker_data[1][0]&&poker_data[1][0]==poker_data[2][0]){
+				return true;
+			}
+		}
+	}
+	//判断单顺的方法
+	function checkStraight(len,poker_data){
+		if(len<5){
+			return false;
+		}else{
+			if(poker_data[0][0]==16||poker_data[0][0]==15){
+				return false;
+			}else{
+				for(var i=0;i<len-1;i++){
+					if(poker_data[i][0]-1!=poker_data[i+1][0]){
+						return false;
+					}
+				}
+				return true;
+			}
+		}
+		return;	
+	}
+	//判断双顺的方法
+	function doubleStraight(len,arr){
+		if(len<6 ){
+			return false;
+		}else{
+			if(arr[0][0]==16||arr[0][0]==15){
+				return false;
+			}else{
+				for(var i=0;i<arr.length-3;i+=2){
+					if(arr[i][0] != arr[i+1][0] && arr[i+1][0]-1 !=arr[i+2][0]){
+					return false;
+					}
+				}
+			return $('body').append('<audio src="./music/Man_liandui.ogg" autoplay="autoplay"></audio>')
+			return true;
+			}
+		}
+		return;
+	}
+	//判断三顺的方法 
+	function tripleStraight(len,arr){
+		if(len<6){
+			return false;
+		}else{
+			if(arr[0][0]==16||arr[0][0]==15){
+				return false;
+			}else{
+				for(var i=0;i<len-4;i+=3){
+					if(arr[i][0] !=arr[i+2][0] || arr[i][0]-1 !=arr[i+3][0]){
+						return false;
+					}
+				}
+				return $('body').append('<audio src="./music/Man_liandui.ogg" autoplay="autoplay"></audio>')
+				return true;
+			}
+		}
+		return;
+	}
+	//判断炸弹的方法
+	function bomb(len,poker_data){
+		if(len!=4){
+			return false;
+		}else{
+			if(poker_data[0][0]==poker_data[1][0]&&poker_data[2][0]==poker_data[0][0]&&poker_data[3][0]==poker_data[0][0]){
+				return true;
+			}else{
+				return false;
+			}
+		}
+	}
+	//判断三带一的方法
+	function AAAB(len,poker_data){
+		if(len==4){
+			if(poker_data[0][0]==poker_data[1][0]&&poker_data[1][0]==poker_data[2][0]||poker_data[3][0]==poker_data[1][0]&&poker_data[1][0]==poker_data[2][0]){
+				return true;
+			}
+		}else if(len==5){
+			if(poker_data[0][0]==poker_data[1][0]&&poker_data[1][0]==poker_data[2][0]&&poker_data[3][0]==poker_data[4][0]||poker_data[2][0]==poker_data[3][0]&&poker_data[4][0]==poker_data[2][0]&&poker_data[0][0]==poker_data[1][0]){
+				return true;
+			}
+		}else{
+			return false;
+		}
+	}
+	//判断四带二的方法
+	function AAAABB(len,poker_data){
+		if(len == 6){
+			if(poker_data[0][0]==poker_data[1][0]&&poker_data[1][0]==poker_data[2][0]&&poker_data[3][0]==poker_data[0][0]||poker_data[1][0]==poker_data[2][0]&&poker_data[3][0]==poker_data[1][0]&&poker_data[3][0]==poker_data[1][0]||poker_data[2][0]==poker_data[3][0]&&poker_data[4][0]==poker_data[2][0]&&poker_data[5][0]==poker_data[2][0]){
+				return true;
+			}
+		}else if(len == 8){
+			if(poker_data[0][0]==poker_data[1][0]&&poker_data[0][0]==poker_data[2][0]&&poker_data[3][0]==poker_data[0][0]&&poker_data[4][0]==poker_data[5][0]&&poker_data[6][0]==poker_data[7][0]||poker_data[2][0]==poker_data[3][0]&&poker_data[4][0]==poker_data[2][0]&&poker_data[5][0]==poker_data[2][0]&&poker_data[0][0]==poker_data[1][0]&&poker_data[6][0]==poker_data[7][0]||poker_data[4][0]==poker_data[5][0]&&poker_data[6][0]==poker_data[4][0]&&poker_data[7][0]==poker_data[4][0]&&poker_data[0][0]==poker_data[1][0]&&poker_data[2][0]==poker_data[3][0]){
+				return true;
+			}
+		}else{
+			return false;
+		}
+	}
+	//判断飞机带翅膀
+	function planeWing(len,arr){
+		var max = false;
+		if(arr[0][0] == 16|| arr[0][0] == 15){
+			return false;
+		}else{
+			switch(len){
+				case 8:
+					if(arr[0][0] == arr[2][0] && arr[2][0]-1 == arr[3][0] && arr[3][0] == arr[5][0]){
+						max = arr[2][0];
+					}else if(arr[1][0] == arr[3][0] && arr[3][0]-1 == arr[4][0] && arr[4][0] == arr[6][0]){
+						max = arr[2][0];
+					}else if(arr[2][0] == arr[4][0] && arr[4][0]-1 == arr[5][0] && arr[5][0] == arr[7][0]){
+						max = arr[2][0];
+					}
+				break;
+
+				case 10:
+					if(arr[0][0] == arr[2][0] && arr[2][0]-1 == arr[3][0] && arr[3][0] == arr[5][0] && arr[6][0] == arr[7][0] && arr[8][0] == arr[9][0]){
+						max = arr[0][0];
+					}else if(arr[0][0] == arr[1][0] && arr[8][0]==arr[9][0] && arr[2][0] == arr[4][0] && arr[4][0]-1 == arr[5][0] && arr[5][0] == arr[7][0]){
+						max = arr[2][0];
+					}else if(arr[0][0] == arr[1][0] && arr[2][0]==arr[3][0] && arr[4][0] == arr[6][0] && arr[6][0]-1 == arr[7][0] && arr[7][0] == arr[9][0]){
+						max = arr[4][0];
+					}
+				break;
+
+				case 12:
+					if(arr[0][0] == arr[2][0] && arr[2][0]-1 == arr[3][0] && arr[3][0] == arr[5][0] && arr[5][0]-1 == arr[6][0] && arr[6][0] == arr[8][0]){
+						max = arr[0][0];
+					}else if(arr[1][0] == arr[3][0] && arr[3][0]-1 == arr[4][0] && arr[4][0] == arr[6][0] && arr[6][0]-1 == arr[7][0] && arr[7][0] == arr[9][0]){
+						max = arr[1][0];
+					}else if(arr[2][0] == arr[4][0] && arr[4][0]-1 == arr[5][0] && arr[5][0] == arr[7][0] && arr[7][0]-1 == arr[8][0] && arr[8][0] == arr[10][0]){
+						max = arr[2][0];
+					}else if(arr[3][0] == arr[5][0] && arr[5][0]-1 == arr[6][0] && arr[6][0] == arr[8][0] && arr[8][0]-1 == arr[9][0] && arr[9][0] == arr[11][0]){
+						max = arr[3][0];
+					}
+				break;
+
+				case 15:
+					if(arr[0][0] == arr[2][0] && arr[2][0]-1 == arr[3][0] && arr[3][0] == arr[5][0] && arr[5][0]-1 == arr[6][0] && arr[6][0] == arr[8][0] && arr[9][0] == arr[10][0] && arr[11][0] == arr[12][0] && arr[13][0] == arr[14][0]){
+						max = arr[0][0];
+					}else if(arr[2][0] == arr[4][0] && arr[4][0]-1 == arr[5][0] && arr[5][0] == arr[7][0] && arr[7][0]-1 == arr[8][0] && arr[8][0] == arr[10][0] && arr[11][0] == arr[12][0] && arr[13][0] == arr[14][0] && arr[0][0] == arr[1][0]){
+						max = arr[2][0];
+					}else if(arr[4][0] == arr[6][0] && arr[6][0]-1 == arr[7][0] && arr[7][0] == arr[9][0] && arr[9][0]-1 == arr[10][0] && arr[10][0] == arr[12][0] && arr[13][0] == arr[14][0] && arr[2][0] == arr[3][0] && arr[0][0] == arr[1][0]){
+						max = arr[4][0];
+					}else if(arr[6][0] == arr[8][0] && arr[8][0]-1 == arr[9][0] && arr[9][0] == arr[11][0] && arr[11][0]-1 == arr[12][0] && arr[12][0] == arr[14][0] && arr[4][0] == arr[5][0] && arr[2][0] == arr[3][0] && arr[0][0] == arr[1][0]){
+						max = arr[6][0];
+					}
+				break;
+
+				case 16:
+					if(arr[0][0] == arr[2][0] && arr[2][0]-1 == arr[3][0] && arr[3][0] == arr[5][0] && arr[5][0]-1 == arr[6][0] && arr[6][0] == arr[8][0] && arr[8][0]-1 == arr[9][0] && arr[9][0] == arr[11][0]){
+						max = arr[0][0];
+					}else if(arr[1][0] == arr[3][0] && arr[3][0]-1 == arr[4][0] && arr[4][0] == arr[6][0] && arr[6][0]-1 == arr[7][0] && arr[7][0] == arr[9][0] && arr[9][0]-1 == arr[10][0] && arr[10][0] == arr[12][0]){
+						max == arr[1][0];
+					}else if(arr[2][0] == arr[4][0] && arr[4][0]-1 == arr[5][0] && arr[5][0] == arr[7][0] && arr[7][0]-1 == arr[8][0] && arr[8][0] == arr[10][0] && arr[10][0]-1 == arr[11][0] && arr[11][0] == arr[13][0]){
+						max == arr[2][0];
+					}else if(arr[3][0] == arr[5][0] && arr[5][0]-1 == arr[6][0] && arr[6][0] == arr[8][0] && arr[8][0]-1 == arr[9][0] && arr[9][0] == arr[11][0] && arr[11][0]-1 == arr[12][0] && arr[12][0] == arr[14][0]){
+						max == arr[3][0];
+					}else if(arr[4][0] == arr[6][0] && arr[6][0]-1 == arr[7][0] && arr[7][0] == arr[9][0] && arr[9][0]-1 == arr[10][0] && arr[10][0] == arr[12][0] && arr[12][0]-1 == arr[13][0] && arr[13][0] == arr[15][0]){
+						max == arr[4][0];
+					}
+				break;
+
+				case 20:
+					if(arr[0][0] == arr[2][0] && arr[2][0]-1 == arr[3][0] && arr[3][0] == arr[5][0] && arr[5][0]-1 == arr[6][0] && arr[6][0] == arr[8][0] && arr[8][0]-1 == arr[9][0] && arr[9][0] == arr[11][0] && arr[12][0] == arr[13][0] && arr[14][0] == arr[15][0] && arr[16][0] == arr[17][0] && arr[18][0] == arr[19][0]){
+						max == arr[0][0];
+					}else if(arr[2][0] == arr[4][0] && arr[4][0]-1 == arr[5][0] && arr[5][0] == arr[7][0] && arr[7][0]-1 == arr[8][0] && arr[8][0] == arr[10][0] && arr[10][0]-1 == arr[11][0] && arr[11][0] == arr[13][0] && arr[0][0] == arr[1][0] && arr[14][0] == arr[15][0] && arr[16][0] == arr[17][0] && arr[18][0] == arr[19][0]){
+						max == arr[2][0];
+					}else if(arr[4][0] == arr[6][0] && arr[6][0]-1 == arr[7][0] && arr[7][0] == arr[9][0] && arr[9][0]-1 == arr[10][0] && arr[10][0] == arr[12][0] && arr[12][0]-1 == arr[13][0] && arr[13][0] == arr[15][0] && arr[0][0] == arr[1][0] && arr[2][0] == arr[3][0] && arr[16][0] == arr[17][0] && arr[18][0] == arr[19][0]){
+						max == arr[4][0];
+					}else if(arr[6][0] == arr[8][0] && arr[8][0]-1 == arr[9][0] && arr[9][0] == arr[11][0] && arr[11][0]-1 == arr[12][0] && arr[12][0] == arr[14][0] && arr[14][0]-1 == arr[15][0] && arr[15][0] == arr[17][0] && arr[0][0] == arr[1][0] && arr[2][0] == arr[3][0] && arr[4][0] == arr[5][0] && arr[18][0] == arr[19][0]){
+						max == arr[6][0];
+					}else if(arr[8][0] == arr[10][0] && arr[10][0]-1 == arr[11][0] && arr[11][0] == arr[13][0] && arr[13][0]-1 == arr[14][0] && arr[14][0] == arr[16][0] && arr[16][0]-1 == arr[17][0] && arr[17][0] == arr[19][0] && arr[0][0] == arr[1][0] && arr[2][0] == arr[3][0] && arr[4][0] == arr[5][0] && arr[6][0] == arr[7][0]){
+						max == arr[8][0];
+					}
+				break;
+			}
+		}
+	$('body').append('<audio src="./music/Man_feiji.ogg" autoplay="autoplay"></audio>')
+	return max;
+	}
+	//定义一个出牌方法
+	function discard(arr,x){
+		$('.p0 li').remove();
+		for(var i=0;i<arr.length;i++){
+			desktop_poker.poker.push(ready_poker.poker[i]);
+			makePoker(0,arr[i],i,skin);
+			$('.p0 li').eq(i).css({width:'100px',height:'148px','background-size':'100%'});
+			var del_index = all_play[x].poker.indexOf(arr[i]);
+			all_play[x].poker.splice(del_index,1);
+			// console.log('下标：'+del_index);
+		}
+		//玩家出牌后出牌数据初始化
+		ready_poker = {poker:[],type:0,max:0};
+		// console.log(all_play[0].poker);
+		$('.p'+(x+1)+' li').remove();
+		//设置定时器 在出牌后的1.5s清除音频和火箭动画
+		setTimeout(function(){
+			$('audio').remove();
+			$('#rocket').remove()
+		},1500)
+
+		for(var j=0;j<all_play[x].poker.length;j++){
+			makePoker((x+1),all_play[x].poker[j],j,skin);
+		}
+		if(all_play[x].poker.length == 0){
+			alert('玩家'+(x+1)+'赢了');
+			window.location.reload();
+		}
+	}
+	//定义一个牌型对决方法
+	function pokerVS(){
+		// 桌面上没有牌，任何牌型都可以出
+		if(desktop_poker.type == 0){
+			return true;
+		}else if(ready_poker.type == 888){//出牌的是王炸可以直接出
+			return true;
+		}else if(desktop_poker.type !=999 && desktop_poker.type !=888 && ready_poker.type == 999){
+			//桌面上的牌不是炸弹和王炸，那玩家的牌只要是炸弹就可以出
+			return true;
+		}else if(desktop_poker.type == ready_poker.type && ready_poker.poker.length == desktop_poker.poker.length && ready_poker.max-0 > desktop_poker.max-0){
+			//普通类型判断
+			return true;
+		}else{
+			return false;
+		}
+	}
+	//定义一个点击不要按钮时初始卡牌和卡牌数据的方法
+	function clearSelect(x){
+		ready_poker = {poker:[],type:0,max:0};
+		console.log(x);
+		if(x==1){
+			$('.p'+(x+1)+' li').css({top:'0'});
+		}else{
+			$('.p'+(x+1)+' li').css({left:'0'});
+		}
+		
+	}	
+})

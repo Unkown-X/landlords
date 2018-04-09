@@ -1,0 +1,252 @@
+/*========开场动画CSS样式========*/
+/*========通用样式========*/
+* {margin:0px;padding:0px;}
+li {list-style:none;}
+a {text-decoration:none;}
+/*-======设置主背景样式-======*/
+body {
+	width:100%;
+	height:100%;
+	background:url(../images/1/bg6.jpg)no-repeat top center;
+	background-size:cover;	
+	overflow:hidden;
+}
+/*==========组员名称函数==========*/
+.name {
+	width:100%;
+	height:100%;
+	position:absolute;
+	top:0px;
+	background:rgba(0,0,0,0.5);
+}
+.black {
+	width:100%;
+	height:100%;
+	position:absolute;
+	top:0px;
+	background:#000;
+	opacity:1;
+	animation: black 1.5s linear 1;
+	animation-fill-mode:forwards;
+	z-index:3;
+}
+@keyframes black {
+	0% {
+		opacity:1;
+		z-index:3;
+	}
+	100% {
+		opacity:0;
+		z-index:-1;
+	}
+}
+/*=============组员信息样式=============*/
+.name {
+	width:100%;
+	height:100%;
+	background:#BEC3C7;
+	position:absolute;
+	top:0px;
+	opacity:1;
+	animation: name 1.3s linear 1;
+	animation-fill-mode:forwards;
+	animation-delay:3s;
+	z-index:2;
+}
+@keyframes name {
+	0% {
+		background:#BEC3C7;
+		opacity:1;
+		z-index:2;
+	}	
+	100% {
+		opacity:0;
+		z-index:-1;
+	}
+}
+.group_name {
+	width:1020px;
+	height:394px;
+	margin:100px auto;
+	background:url(../images/1/unknown1.png);
+}
+.name p {
+	width:600px;
+	height:200px;
+	margin:0px auto;
+	font-size:40px;
+	color:#4D7EF8;
+}
+.name p span {
+	padding-left:150px;
+	font-size:40px;
+	color:#7F7F7F;
+	margin:0px 0px 40px 0px;
+}
+audio {display:none;}
+/*=====中间斗地主的主图片=====*/
+.index_img {
+	width:453px;
+	height:215px;
+	background:url(../images/1/doudizhu1.png)no-repeat center;
+	margin:350px auto;
+	transform:scale(0.1);
+	animation:index_img 1s linear 1; 
+	animation-fill-mode:forwards; 
+	animation-delay:3.5s;
+}
+@keyframes index_img {
+	0% {
+		transform:scale(0.1);
+	}
+	100% {
+		transform:scale(1);
+	}
+}
+/*=========左边地主的图片=========*/
+.left_img {
+	width:136px;
+	height:162px;
+	background:url(../images/1/dizhu1.png)no-repeat center;
+	transform:scale(1.5);
+	margin:-120px auto;
+	position:relative;
+	top:-450px;
+	left:-800px;
+	opacity:0;
+	animation: left_img 1s linear 1;
+	animation-delay:5s;
+	animation-fill-mode:forwards; 
+}
+@keyframes left_img {
+	0% {
+		left:-800px;
+		opacity:0;
+	}
+	100% {
+		left:-400px;
+		opacity:1;
+	}
+}
+/*========右边农民的图片========*/
+.right_img {
+	width:130px;
+	height:261px;
+	background:url(../images/1/nongmin1.png)no-repeat center;
+	transform:scale(1.5);
+	margin:-630px auto 200px auto;
+	position:relative;
+	left:800px;
+	opacity:0;
+	animation: right_img 1s linear 1;
+	animation-delay:5s;
+	animation-fill-mode:forwards; 
+}
+@keyframes right_img {
+	0% {
+		left:800px;
+		opacity:0;
+	}
+	100% {
+		left:400px;
+		opacity:1;
+	}
+}
+/*=======下边进度条的图片=======*/
+.scorll {
+	width:600px;
+	height:20px;
+	/*border:1px solid #737373;*/
+	background:#B99C72;
+	border-radius:10px;
+	margin:-180px auto;
+	overflow:hidden;
+	opacity:0;
+	animation: scorll 0.5s linear 1;
+	animation-delay:6s;
+	animation-fill-mode:forwards; 
+}
+@keyframes scorll {
+	0% {
+		opacity:0;
+	}
+	
+	100% {
+		opacity:1;
+	}
+}
+/*=======进度条样式=======*/
+.schedule {
+	width:0px;
+	height:20px;
+	background:#E7D865;
+	animation: schedule 5s linear 1;
+	animation-delay:6s;
+	animation-fill-mode:forwards; 
+}
+@keyframes schedule {
+	0% {
+		width:0px;
+	}
+	
+	100% {
+		width:600px;
+	}
+}
+/*=======money样式=======*/
+.moneys {
+	width:100%;
+	height:500px;
+	margin:-600px auto;
+}
+/*===========地主头像样式===========*/
+.dizhu_img{
+	width:400px;
+	height:420px;
+	background:url(../images/1/dizhu2.png)no-repeat center;
+	margin:0px auto;
+	transform:scale(0);
+	position:relative;
+	top:50px;
+	animation: dizhu_img 0.5s linear 1;
+	animation-delay:11s;
+	animation-fill-mode:forwards; 
+}
+@keyframes dizhu_img {
+	0% {
+		transform:scale(0);
+	}
+	
+	100% {
+		transform:scale(1.5);
+	}
+}
+/*========开始游戏按钮========*/
+.star {
+	display:block;
+	width:117px;
+	height:41px;
+	background:url(../images/1/star1.png)no-repeat center;
+	text-align:center;
+	line-height:80px;
+	transform:scale(1.5);
+	margin:250px auto 0px auto;
+	position:relative;
+	left:450px;
+	opacity:0;
+	animation: star 1s linear 1;
+	animation-delay:11s;
+	animation-fill-mode:forwards; 
+}
+@keyframes star {
+	0% {
+		opacity:0;	
+	}
+	
+	100% {
+		opacity:1;
+	}
+}
+.star:hover {
+	background:url(../images/1/star2.png)no-repeat center;
+}
